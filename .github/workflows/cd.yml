@@ -91,7 +91,7 @@ jobs:
         run: |
           # Save private key
           echo "$PRIVATE_KEY" > private_key.pem
-          chmod 600 private_key.pem
+          chmod 400 private_key.pem
           
           # Copy files to EC2
           scp -i private_key.pem -o StrictHostKeyChecking=no -r deployment/* ec2-user@${INSTANCE_IP}:~/
@@ -118,3 +118,10 @@ jobs:
           echo "Deployment Summary:"
           echo "API URL: http://${INSTANCE_IP}:1337"
           echo "Client URL: http://${INSTANCE_IP}:3000"
+
+      - name: Cleanup on failure
+        if: failure()
+        env:
+          INSTANCE_ID: ${{ steps.create-ec2.outputs.instance_id }}
+        run: |
+          aws ec2 terminate-instances --instance-ids $INSTANCE_ID
