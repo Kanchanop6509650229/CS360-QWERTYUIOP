@@ -51,8 +51,6 @@ jobs:
         env:
           INSTANCE_IP: ${{ steps.create-ec2.outputs.public_ip }}
         run: |
-          ls -l
-
           echo "Creating deployment directory..."
           mkdir -p deployment
           
@@ -94,6 +92,8 @@ jobs:
           # Save private key
           echo "$PRIVATE_KEY" > private_key.pem
           chmod 400 private_key.pem
+
+          ls -l
           
           # Copy files to EC2
           scp -i private_key.pem -o StrictHostKeyChecking=no -r deployment/* ec2-user@${INSTANCE_IP}:~/
