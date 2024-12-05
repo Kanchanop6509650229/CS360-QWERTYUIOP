@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "jest"
+    "test": "jest",
+    "test:unit": "jest ./__test__/unit",
+    "test:integration": "jest ./__test__/integration"
   },
   "jest": {
     "moduleNameMapper": {
