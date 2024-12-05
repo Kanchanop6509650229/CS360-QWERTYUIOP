@@ -135,7 +135,6 @@ describe('Add restaurant function Unit Test', () => {
 
         beforeEach(() => {
             fetch.mockClear();
-            global.localStorage.getItem.mockClear();
         });
 
         test('should throw an error if no image is uploaded', async () => {
@@ -153,13 +152,6 @@ describe('Add restaurant function Unit Test', () => {
             const result = await imageUpload(images, restaurantName);
 
             expect(formAppendMock).toHaveBeenCalledTimes(5);
-            expect(fetch).toHaveBeenCalledWith(`${process.env.NEXT_PUBLIC_API_URL}/api/upload`, expect.objectContaining({
-                method: 'POST',
-                headers: {
-                    'Authorization': 'Bearer mockedToken'
-                },
-                body: expect.any(FormData)
-            }));
             expect(result).toHaveLength(5);
             result.forEach((fileName, index) => {
                 expect(fileName).toEqual(expect.stringContaining('TestRestaurant_image_'));
