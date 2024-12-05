@@ -84,22 +84,22 @@ jobs:
           sleep 60
           echo "SSH is ready!"
 
+      - name: Install ssh keys
+        run: |
+            install -m 600 -D /dev/null ~/.ssh/id_rsa
+            echo "${{ secrets.AWS_SSH_KEY }}" > ~/.ssh/id_rsa
+            ssh-keyscan -H ${{ steps.create-ec2.outputs.public_ip }} > ~/.ssh/known_hosts
+
       - name: Deploy using Docker Compose
         env:
           INSTANCE_IP: ${{ steps.create-ec2.outputs.public_ip }}
-          PRIVATE_KEY: ${{ secrets.AWS_SSH_KEY }}
         run: |
-          # Save private key
-          echo "$PRIVATE_KEY" > private_key.pem
-          chmod 400 private_key.pem
-
-          ls -l
-          
+        
           # Copy files to EC2
-          scp -i private_key.pem -o StrictHostKeyChecking=no -r deployment/* ec2-user@${INSTANCE_IP}:~/
+          scp -r deployment/* ec2-user@${INSTANCE_IP}:~/
           
           # Deploy using Docker Compose
-          ssh -i private_key.pem -o StrictHostKeyChecking=no ec2-user@${INSTANCE_IP} '
+          ssh ec2-user@${INSTANCE_IP} '
             docker-compose pull
             docker-compose up -d
           '
