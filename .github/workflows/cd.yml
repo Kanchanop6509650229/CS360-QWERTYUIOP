@@ -51,6 +51,8 @@ jobs:
         env:
           INSTANCE_IP: ${{ steps.create-ec2.outputs.public_ip }}
         run: |
+          ls -l
+
           echo "Creating deployment directory..."
           mkdir -p deployment
           
