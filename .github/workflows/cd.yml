@@ -94,7 +94,7 @@ jobs:
             sudo systemctl start docker
 
             echo "Creating .env file"
-            cat << EOT > .env
+            cat <<EOT > .env
               JWT_SECRET="${{ secrets.JWT_SECRET }}"
               ADMIN_JWT_SECRET="${{ secrets.ADMIN_JWT_SECRET }}" 
               STRAPI_ADMIN_CLIENT_URL="http://${INSTANCE_IP}:3000" 
