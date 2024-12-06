@@ -74,96 +74,58 @@ jobs:
             
           echo "public_ip=$PUBLIC_IP" >> $GITHUB_OUTPUT
 
-      - name: Deploy using Docker
-        env:
-          INSTANCE_IP: ${{ steps.create-ec2.outputs.public_ip }}
-          PRIVATE_KEY: ${{ secrets.AWS_SSH_KEY }}
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
-          ADMIN_JWT_SECRET: ${{ secrets.ADMIN_JWT_SECRET }}
-          PREVIEW_SECRET: ${{ secrets.PREVIEW_SECRET }}
-        run: |
-          # Save private key
-          echo "$PRIVATE_KEY" > private_key.pem
-          chmod 600 private_key.pem
-
-          # Wait for instance setup to complete
-          echo "Waiting for instance setup to complete..."
-          sleep 90
-    
-          # Deploy using Docker with fixed heredoc
-          ssh -i private_key.pem -o StrictHostKeyChecking=no ec2-user@${INSTANCE_IP} << 'ENDSSH'
-            # Create network for containers
-            sudo docker network create foodadvisor-network || true
-
-            # Stop and remove existing containers if they exist
-            sudo docker rm -f foodadvisor-api foodadvisor-client || true
-            
-            echo "Setting up environment variables..."
-            
-            # Create API env file
-            cat > api.env << 'EOF'
-              HOST=0.0.0.0
-              PORT=1337
-              DATABASE_CLIENT=sqlite
-              DATABASE_FILENAME=.tmp/data.db
-              JWT_SECRET=${JWT_SECRET}
-              ADMIN_JWT_SECRET=${ADMIN_JWT_SECRET}
-              STRAPI_ADMIN_CLIENT_URL=http://${INSTANCE_IP}:3000
-              STRAPI_ADMIN_CLIENT_PREVIEW_SECRET=${PREVIEW_SECRET}
-              NODE_ENV=production
+          - name: Deploy using Docker
+          env:
+            INSTANCE_IP: ${{ steps.create-ec2.outputs.public_ip }}
+            PRIVATE_KEY: ${{ secrets.AWS_SSH_KEY }}
+            DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+            JWT_SECRET: ${{ secrets.JWT_SECRET }}
+            ADMIN_JWT_SECRET: ${{ secrets.ADMIN_JWT_SECRET }}
+            PREVIEW_SECRET: ${{ secrets.PREVIEW_SECRET }}
+          run: |
+            # Save private key
+            echo "$PRIVATE_KEY" > private_key.pem
+            chmod 600 private_key.pem
+        
+            # Wait for instance setup to complete
+            echo "Waiting for instance setup to complete..."
+            sleep 90
+        
+            # Deploy using Docker
+            ssh -i private_key.pem -o StrictHostKeyChecking=no ec2-user@${INSTANCE_IP} << EOF
+              # Stop and remove existing containers if they exist
+              sudo docker rm -f foodadvisor-api foodadvisor-client || true
+              
+              echo "Deploying API"
+              sudo docker pull ${DOCKERHUB_USERNAME}/foodadvisor-api:latest
+              sudo docker run -d --name foodadvisor-api \
+                -p 1337:1337 \
+                -e HOST=0.0.0.0 \
+                -e PORT=1337 \
+                -e DATABASE_CLIENT=sqlite \
+                -e DATABASE_FILENAME=.tmp/data.db \
+                -e JWT_SECRET="${JWT_SECRET}" \
+                -e ADMIN_JWT_SECRET="${ADMIN_JWT_SECRET}" \
+                -e STRAPI_ADMIN_CLIENT_URL="http://${INSTANCE_IP}:3000" \
+                -e STRAPI_ADMIN_CLIENT_PREVIEW_SECRET="${PREVIEW_SECRET}" \
+                -v foodadvisor-uploads:/app/api/public/uploads \
+                ${DOCKERHUB_USERNAME}/foodadvisor-api:latest
+        
+              echo "Deploying Client"
+              sudo docker pull ${DOCKERHUB_USERNAME}/foodadvisor-client:latest
+              sudo docker run -d --name foodadvisor-client \
+                -p 3000:3000 \
+                -e NEXT_PUBLIC_API_URL="http://${INSTANCE_IP}:1337" \
+                -e PREVIEW_SECRET="${PREVIEW_SECRET}" \
+                ${DOCKERHUB_USERNAME}/foodadvisor-client:latest
+        
+              # Verify environment variables
+              echo "API Container Environment:"
+              sudo docker exec foodadvisor-api env | sort
+              
+              echo "Client Container Environment:"
+              sudo docker exec foodadvisor-client env | sort
             EOF
-
-            # Create Client env file
-            cat > client.env << 'EOF'
-              NEXT_PUBLIC_API_URL=http://${INSTANCE_IP}:1337
-              PREVIEW_SECRET=${PREVIEW_SECRET}
-              NODE_ENV=production
-            EOF
-
-            # Replace environment variables in the files
-            sed -i "s|\${JWT_SECRET}|$JWT_SECRET|g" api.env
-            sed -i "s|\${ADMIN_JWT_SECRET}|$ADMIN_JWT_SECRET|g" api.env
-            sed -i "s|\${INSTANCE_IP}|$INSTANCE_IP|g" api.env
-            sed -i "s|\${PREVIEW_SECRET}|$PREVIEW_SECRET|g" api.env
-            
-            sed -i "s|\${INSTANCE_IP}|$INSTANCE_IP|g" client.env
-            sed -i "s|\${PREVIEW_SECRET}|$PREVIEW_SECRET|g" client.env
-
-            echo "Deploying API"
-            sudo docker pull ${DOCKERHUB_USERNAME}/foodadvisor-api:latest
-            sudo docker run -d --name foodadvisor-api \
-              --network foodadvisor-network \
-              -p 1337:1337 \
-              --env-file api.env \
-              -v foodadvisor-uploads:/app/api/public/uploads \
-              ${DOCKERHUB_USERNAME}/foodadvisor-api:latest
-
-            echo "Deploying Client"
-            sudo docker pull ${DOCKERHUB_USERNAME}/foodadvisor-client:latest
-            sudo docker run -d --name foodadvisor-client \
-              --network foodadvisor-network \
-              -p 3000:3000 \
-              --env-file client.env \
-              ${DOCKERHUB_USERNAME}/foodadvisor-client:latest
-
-            # Print environment files contents for verification
-            echo "API environment file contents:"
-            cat api.env
-            
-            echo "Client environment file contents:"
-            cat client.env
-            
-            echo "Verifying container environments..."
-            echo "API container environment:"
-            sudo docker exec foodadvisor-api printenv | sort
-            
-            echo "Client container environment:"
-            sudo docker exec foodadvisor-client printenv | sort
-            
-            # Clean up env files
-            rm api.env client.env
-          ENDSSH
 
       - name: Verify deployment with enhanced checks
         env:
