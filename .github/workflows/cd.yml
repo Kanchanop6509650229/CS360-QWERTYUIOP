@@ -111,20 +111,21 @@ jobs:
             STRAPI_ADMIN_CLIENT_URL=http://${{ steps.create-ec2.outputs.public_ip }}:3000
             STRAPI_ADMIN_CLIENT_PREVIEW_SECRET=${{ secrets.PREVIEW_SECRET }}
             DATABASE_CLIENT=sqlite
+            DATABASE_FILENAME=.tmp/data.db
             NODE_ENV=production
-            EOT
+          EOT
 
             # Create Client .env files
             cat > /app/client/.env << EOT
             NEXT_PUBLIC_API_URL=http://${{ steps.create-ec2.outputs.public_ip }}:1337
             PREVIEW_SECRET=${{ secrets.PREVIEW_SECRET }}
             NODE_ENV=production
-            EOT
+          EOT
 
             cat > /app/client/.env.development << EOT
             NEXT_PUBLIC_API_URL=http://${{ steps.create-ec2.outputs.public_ip }}:1337
             PREVIEW_SECRET=${{ secrets.PREVIEW_SECRET }}
-            EOT
+          EOT
 
             # Pull and run API container
             sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/foodadvisor-api:latest
@@ -133,6 +134,7 @@ jobs:
               -p 1337:1337 \
               -v /app/api/.env:/app/api/.env \
               -v /app/api/public/uploads:/app/api/public/uploads \
+              -v /app/api/.tmp:/app/api/.tmp \
               ${{ secrets.DOCKERHUB_USERNAME }}/foodadvisor-api:latest
 
             # Pull and run Client container
@@ -142,7 +144,8 @@ jobs:
               -p 3000:3000 \
               -v /app/client/.env:/app/client/.env \
               -v /app/client/.env.development:/app/client/.env.development \
-              ${{ secrets.DOCKERHUB_USERNAME }}/foodadvisor-client:latest
+              ${{ secrets.DOCKERHUB_USERNAME }}/foodadvisor-client:latest \
+              /bin/sh -c "yarn build && yarn start"
 
             # Verify container status
             echo "Checking container status..."
