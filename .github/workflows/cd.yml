@@ -23,6 +23,30 @@ jobs:
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: ${{ secrets.AWS_REGION }}
 
+      - name: Check if Docker Image Exists API
+        id: check_image_API
+        run: |
+          REPOSITORYAPI="${{ secrets.DOCKERHUB_USERNAME }}/foodadvisor-api"  
+          TAG="latest"
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -u "${{ secrets.DOCKERHUB_USERNAME }}:${{ secrets.DOCKERHUB_TOKEN }}" https://hub.docker.com/v2/repositories/${REPOSITORYAPI}/tags/${TAG}/)
+          if [ "$RESPONSE" -ne 200 ]; then
+              echo "Docker image not found. Exiting workflow."
+              exit 1
+            fi
+          echo "Docker image exists. Proceeding to deployment."
+  
+      - name: Check if Docker Image Exists Client
+        id: check_image_client
+        run: |
+          REPOSITORYCLIENT="${{ secrets.DOCKERHUB_USERNAME }}/foodadvisor-client"
+          TAG="latest"
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -u "${{ secrets.DOCKERHUB_USERNAME }}:${{ secrets.DOCKERHUB_TOKEN }}" https://hub.docker.com/v2/repositories/${REPOSITORYCLIENT}/tags/${TAG}/)
+          if [ "$RESPONSE" -ne 200 ]; then
+              echo "Docker image not found. Exiting workflow."
+              exit 1
+          fi
+          echo "Docker image exists. Proceeding to deployment."
+
       - name: Create EC2 instance
         id: create-ec2
         run: |
@@ -57,60 +81,41 @@ jobs:
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           ADMIN_JWT_SECRET: ${{ secrets.ADMIN_JWT_SECRET }}
           PREVIEW_SECRET: ${{ secrets.PREVIEW_SECRET }}
+          REPOSITORYAPI: ${{ secrets.DOCKERHUB_USERNAME }}/foodadvisor-api
+          REPOSITORYCLIENT: ${{ secrets.DOCKERHUB_USERNAME }}/foodadvisor-client
         run: |
           # Save private key
           echo "$PRIVATE_KEY" > private_key.pem
           chmod 600 private_key.pem
-    
-          # Create API environment file
-          cat << EOF > api.env
-          HOST=0.0.0.0
-          PORT=1337
-          NODE_ENV=development
-          JWT_SECRET=${JWT_SECRET}
-          ADMIN_JWT_SECRET=${ADMIN_JWT_SECRET}
-          STRAPI_ADMIN_CLIENT_URL=http://${INSTANCE_IP}:3000
-          STRAPI_ADMIN_CLIENT_PREVIEW_SECRET=${PREVIEW_SECRET}
-          EOF
 
-          # Create Client environment file
-          cat << EOF > client.env
-          NODE_ENV=development
-          NEXT_PUBLIC_API_URL=http://${INSTANCE_IP}:1337
-          PREVIEW_SECRET=${PREVIEW_SECRET}
-          EOF
-
-          # Create docker environment file
-          cat << EOF > .env
-          DOCKERHUB_USERNAME=${DOCKERHUB_USERNAME}
-          EOF
-    
           # Wait for user-data script to complete
           echo "Waiting for instance setup to complete..."
           sleep 90
     
-          # Copy files to EC2
-          scp -i private_key.pem -o StrictHostKeyChecking=no \
-            .env api.env client.env docker-compose.yml \
-            ec2-user@${INSTANCE_IP}:~/
-    
           # Deploy using Docker Compose
           ssh -i private_key.pem -o StrictHostKeyChecking=no ec2-user@${INSTANCE_IP} << 'EOF'
-            # Create required directories
-            sudo mkdir -p /app/public/uploads
-            sudo chown -R ec2-user:docker /app/public/uploads
+            sudo yum install -y docker
+            sudo systemctl start docker
       
-            # Load environment variables
-            set -a
-            source .env
-            set +a
-      
-            # Pull images and start containers
-            sudo docker-compose pull
-            sudo docker-compose up -d
-      
-            # Verify containers are running
-            sudo docker-compose ps
+            echo "Deploying API"
+            sudo docker pull $REPOSITORYAPI:latest
+            sudo docker run -d --name foodadvisor-api \
+              -p 1337:1337 \
+              -e HOST=0.0.0.0 \
+              -e PORT=1337 \
+              -e DATABASE_CLIENT=sqlite \
+              -e DATABASE_FILENAME=.tmp/data.db \
+              -e STRAPI_ADMIN_CLIENT_URL=http://${INSTANCE_IP}:3000 \
+              -e JWT_SECRET=${{ secrets.JWT_SECRET }} \
+              -e ADMIN_JWT_SECRET=${{ secrets.ADMIN_JWT_SECRET }} \
+              $REPOSITORYAPI:latest
+
+            echo "Deploying Client"
+            sudo docker pull $REPOSITORYCLIENT:latest
+            sudo docker run -d --name foodadvisor-client \
+              -p 3000:3000 \
+              -e NEXT_PUBLIC_API_URL=http://${INSTANCE_IP}:1337 \
+              $REPOSITORYCLIENT:latest  
       
             # Check API environment
             echo "Verifying API environment variables..."
