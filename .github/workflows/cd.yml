@@ -112,19 +112,19 @@ jobs:
             STRAPI_ADMIN_CLIENT_PREVIEW_SECRET=${{ secrets.PREVIEW_SECRET }}
             DATABASE_CLIENT=sqlite
             NODE_ENV=production
-            EOT
+          EOT
 
             # Create Client .env files
             cat > /app/client/.env << EOT
             NEXT_PUBLIC_API_URL=http://${{ steps.create-ec2.outputs.public_ip }}:1337
             PREVIEW_SECRET=${{ secrets.PREVIEW_SECRET }}
             NODE_ENV=production
-            EOT
+          EOT
 
             cat > /app/client/.env.development << EOT
             NEXT_PUBLIC_API_URL=http://${{ steps.create-ec2.outputs.public_ip }}:1337
             PREVIEW_SECRET=${{ secrets.PREVIEW_SECRET }}
-            EOT
+          EOT
 
             # Pull and run API container
             sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/foodadvisor-api:latest
