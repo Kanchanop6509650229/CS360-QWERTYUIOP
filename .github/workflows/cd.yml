@@ -93,12 +93,6 @@ jobs:
             sudo yum install -y docker
             sudo systemctl start docker
 
-            echo "Debugging environment variables"
-            echo "JWT_SECRET=${{ secrets.JWT_SECRET }}"
-            echo "ADMIN_JWT_SECRET=${{ secrets.ADMIN_JWT_SECRET }}"
-            echo "STRAPI_ADMIN_CLIENT_PREVIEW_SECRET=${{ secrets.PREVIEW_SECRET }}"
-            echo "NEXT_PUBLIC_API_URL=http://${{ steps.create-ec2.outputs.public_ip }}:1337"
-
             echo "Creating .env file"
             cat <<EOT > .env
             JWT_SECRET=${{ secrets.JWT_SECRET }}
@@ -120,7 +114,7 @@ jobs:
             sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/foodadvisor-client:latest
             sudo docker run -d --name foodadvisor-client \
               -p 3000:3000 \
-              --env-file .env.development \
+              --env-file .env \
               ${{ secrets.DOCKERHUB_USERNAME }}/foodadvisor-client:latest  
 
             # Check API environment
