@@ -99,7 +99,7 @@ jobs:
             sudo systemctl start docker
       
             echo "Deploying API"
-            sudo docker pull $REPOSITORYAPI:latest
+            sudo docker pull ${REPOSITORYAPI}:latest
             sudo docker run -d --name foodadvisor-api \
               -p 1337:1337 \
               -e HOST=0.0.0.0 \
@@ -109,14 +109,14 @@ jobs:
               -e STRAPI_ADMIN_CLIENT_URL=http://${INSTANCE_IP}:3000 \
               -e JWT_SECRET=${{ secrets.JWT_SECRET }} \
               -e ADMIN_JWT_SECRET=${{ secrets.ADMIN_JWT_SECRET }} \
-              $REPOSITORYAPI:latest
+              ${REPOSITORYAPI}:latest
 
             echo "Deploying Client"
-            sudo docker pull $REPOSITORYCLIENT:latest
+            sudo docker pull ${REPOSITORYCLIENT}:latest
             sudo docker run -d --name foodadvisor-client \
               -p 3000:3000 \
               -e NEXT_PUBLIC_API_URL=http://${INSTANCE_IP}:1337 \
-              $REPOSITORYCLIENT:latest  
+              ${REPOSITORYCLIENT}:latest  
       
             # Check API environment
             echo "Verifying API environment variables..."
