@@ -8,6 +8,7 @@ describe('UserProfile Integration', () => {
     const mockToken = 'test-integration-token';
     
     beforeEach(() => {
+        process.env.NEXT_PUBLIC_API_URL = 'http://localhost:1337';
         jest.clearAllMocks();
     });
 
