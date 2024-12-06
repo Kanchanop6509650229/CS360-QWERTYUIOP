@@ -3,6 +3,8 @@ import Cta from './cta';
 import LocalSwitch from './localSwitch';
 import Logo from './logo';
 import Nav from './nav';
+
+import GitHubButton from 'react-github-btn';
 import { useContext } from 'react';
 import { AuthContext } from '../../../context/AuthContext';
 import Link from 'next/link';
@@ -45,6 +47,23 @@ const Navigation = ({ navigation, pageData, type }) => {
             <div className="ml-4">
               <LocalSwitch pageData={pageData} type={type} />
             </div>
+            <Cta
+              href={delve(navigation, 'rightButton.href')}
+              target={delve(navigation, 'rightButton.target')}
+              label={delve(navigation, 'rightButton.label')}
+            />
+            <LocalSwitch pageData={pageData} type={type} />
+
+            <Link href="/userprofile">
+              <a className="flex items-center hover:text-gray-900 ml-8 -mt-2">
+                <img
+                  src="/user.png"
+                  alt="User Profile"
+                  className="w-9 h-9 mr-2"
+                />
+              </a>
+
+            </Link>
           </div>
         )}
       </div>
