@@ -33,7 +33,7 @@ jobs:
           if [ "$RESPONSE" -ne 200 ]; then
               echo "Docker image not found. Exiting workflow."
               exit 1
-          fi
+            fi
           echo "Docker image exists. Proceeding to deployment."
 
       - name: Check if Docker Image Exists Client
@@ -47,10 +47,10 @@ jobs:
               exit 1
           fi
           echo "Docker image exists. Proceeding to deployment."
-
       - name: Create EC2 instance
         id: create-ec2
         run: |
+          # Create EC2 instance with larger root volume
           INSTANCE_ID=$(aws ec2 run-instances \
             --image-id ami-0230bd60aa48260c6 \
             --instance-type t2.medium \
@@ -61,19 +61,18 @@ jobs:
             --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=FoodAdvisor-Production}]' \
             --query 'Instances[0].InstanceId' \
             --output text)
-          
+
           echo "instance_id=$INSTANCE_ID" >> $GITHUB_OUTPUT
-          
+
           aws ec2 wait instance-running --instance-ids ${INSTANCE_ID}
-          
+
           PUBLIC_IP=$(aws ec2 describe-instances \
             --instance-ids $INSTANCE_ID \
             --query 'Reservations[0].Instances[0].PublicIpAddress' \
             --output text)
             
           echo "public_ip=$PUBLIC_IP" >> $GITHUB_OUTPUT
-
-      - name: Deploy using Docker
+      - name: Deploy using Docker Compose
         env:
           INSTANCE_IP: ${{ steps.create-ec2.outputs.public_ip }}
           PRIVATE_KEY: ${{ secrets.AWS_SSH_KEY }}
@@ -82,55 +81,54 @@ jobs:
           ADMIN_JWT_SECRET: ${{ secrets.ADMIN_JWT_SECRET }}
           PREVIEW_SECRET: ${{ secrets.PREVIEW_SECRET }}
         run: |
+          # Save private key
           echo "$PRIVATE_KEY" > private_key.pem
           chmod 600 private_key.pem
-          
+          # Wait for user-data script to complete
           echo "Waiting for instance setup to complete..."
           sleep 90
-          
-          ssh -i private_key.pem -o StrictHostKeyChecking=no ec2-user@${INSTANCE_IP} "$(cat << 'ENDSSH'
-            sudo docker rm -f foodadvisor-api foodadvisor-client || true
-            
+
+          # Deploy using Docker Compose
+          ssh -i private_key.pem -o StrictHostKeyChecking=no ec2-user@${INSTANCE_IP} << 'EOF'
+            sudo yum install -y docker
+            sudo systemctl start docker
+
             echo "Deploying API"
-            sudo docker pull ${DOCKERHUB_USERNAME}/foodadvisor-api:latest
+            sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/foodadvisor-api:latest
             sudo docker run -d --name foodadvisor-api \
               -p 1337:1337 \
               -e HOST=0.0.0.0 \
               -e PORT=1337 \
               -e DATABASE_CLIENT=sqlite \
               -e DATABASE_FILENAME=.tmp/data.db \
-              -e JWT_SECRET=${JWT_SECRET} \
-              -e ADMIN_JWT_SECRET=${ADMIN_JWT_SECRET} \
               -e STRAPI_ADMIN_CLIENT_URL=http://${INSTANCE_IP}:3000 \
-              -e STRAPI_ADMIN_CLIENT_PREVIEW_SECRET=${PREVIEW_SECRET} \
-              -v foodadvisor-uploads:/app/api/public/uploads \
-              ${DOCKERHUB_USERNAME}/foodadvisor-api:latest
-            
+              -e JWT_SECRET=${{ secrets.JWT_SECRET }} \
+              -e ADMIN_JWT_SECRET=${{ secrets.ADMIN_JWT_SECRET }} \
+              ${{ secrets.DOCKERHUB_USERNAME }}/foodadvisor-api:latest
+
             echo "Deploying Client"
-            sudo docker pull ${DOCKERHUB_USERNAME}/foodadvisor-client:latest
+            sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/foodadvisor-client:latest
             sudo docker run -d --name foodadvisor-client \
               -p 3000:3000 \
               -e NEXT_PUBLIC_API_URL=http://${INSTANCE_IP}:1337 \
-              -e PREVIEW_SECRET=${PREVIEW_SECRET} \
-              ${DOCKERHUB_USERNAME}/foodadvisor-client:latest
-            
-            echo "Verifying containers..."
-            sudo docker ps
-            
-            echo "API Container Environment:"
-            sudo docker exec foodadvisor-api env | sort
-            
-            echo "Client Container Environment:"
-            sudo docker exec foodadvisor-client env | sort
-          ENDSSH
-          )"
+              ${{ secrets.DOCKERHUB_USERNAME }}/foodadvisor-client:latest  
+
+            # Check API environment
+            echo "Verifying API environment variables..."
+            sudo docker exec foodadvisor-api printenv | grep -E "JWT_SECRET|ADMIN_JWT_SECRET|PREVIEW_SECRET"
+
+            # Check Client environment
+            echo "Verifying Client environment variables..."
+            sudo docker exec foodadvisor-client printenv | grep -E "PREVIEW_SECRET|NEXT_PUBLIC_API_URL"
+          EOF
 
       - name: Verify deployment with enhanced checks
         env:
           INSTANCE_IP: ${{ steps.create-ec2.outputs.public_ip }}
         run: |
           echo "Verifying deployment..."
-          
+
+          # Function to check endpoint
           check_endpoint() {
             local url=$1
             local max_attempts=10
@@ -146,15 +144,17 @@ jobs:
             done
             return 1
           }
-          
+
+          # Check API endpoint
           if ! check_endpoint "http://${INSTANCE_IP}:1337/admin"; then
             echo "API endpoint verification failed"
             exit 1
           fi
-          
+
+          # Check client endpoint
           if ! check_endpoint "http://${INSTANCE_IP}:3000"; then
             echo "Client endpoint verification failed"
             exit 1
           fi
-          
+
           echo "Deployment verified successfully!"
