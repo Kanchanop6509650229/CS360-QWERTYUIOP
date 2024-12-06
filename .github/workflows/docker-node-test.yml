@@ -6,6 +6,7 @@ on:
       - main 
       - develop
       - improvement-coding-and-documentation
+      - test-cd
     paths-ignore:
       - 'README.md'
       - 'docs/**'
