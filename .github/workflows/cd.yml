@@ -82,8 +82,6 @@ jobs:
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           ADMIN_JWT_SECRET: ${{ secrets.ADMIN_JWT_SECRET }}
           PREVIEW_SECRET: ${{ secrets.PREVIEW_SECRET }}
-          REPOSITORYAPI: ${{ secrets.DOCKERHUB_USERNAME }}/foodadvisor-api
-          REPOSITORYCLIENT: ${{ secrets.DOCKERHUB_USERNAME }}/foodadvisor-client
         run: |
           # Save private key
           echo "$PRIVATE_KEY" > private_key.pem
@@ -99,7 +97,7 @@ jobs:
             sudo systemctl start docker
       
             echo "Deploying API"
-            sudo docker pull ${REPOSITORYAPI}:latest
+            sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/foodadvisor-api:latest
             sudo docker run -d --name foodadvisor-api \
               -p 1337:1337 \
               -e HOST=0.0.0.0 \
@@ -109,14 +107,14 @@ jobs:
               -e STRAPI_ADMIN_CLIENT_URL=http://${INSTANCE_IP}:3000 \
               -e JWT_SECRET=${{ secrets.JWT_SECRET }} \
               -e ADMIN_JWT_SECRET=${{ secrets.ADMIN_JWT_SECRET }} \
-              ${REPOSITORYAPI}:latest
+              ${{ secrets.DOCKERHUB_USERNAME }}/foodadvisor-api:latest
 
             echo "Deploying Client"
-            sudo docker pull ${REPOSITORYCLIENT}:latest
+            sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/foodadvisor-client:latest
             sudo docker run -d --name foodadvisor-client \
               -p 3000:3000 \
               -e NEXT_PUBLIC_API_URL=http://${INSTANCE_IP}:1337 \
-              ${REPOSITORYCLIENT}:latest  
+              ${{ secrets.DOCKERHUB_USERNAME }}/foodadvisor-client:latest  
       
             # Check API environment
             echo "Verifying API environment variables..."
