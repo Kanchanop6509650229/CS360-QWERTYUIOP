@@ -106,10 +106,7 @@ jobs:
             cat > /app/api/.env << EOT
             HOST=0.0.0.0
             PORT=1337
-            APP_KEYS=${{ secrets.APP_KEYS }}
-            API_TOKEN_SALT=${{ secrets.API_TOKEN_SALT }}
             ADMIN_JWT_SECRET=${{ secrets.ADMIN_JWT_SECRET }}
-            TRANSFER_TOKEN_SALT=${{ secrets.TRANSFER_TOKEN_SALT }}
             JWT_SECRET=${{ secrets.JWT_SECRET }}
             STRAPI_ADMIN_CLIENT_URL=http://${{ steps.create-ec2.outputs.public_ip }}:3000
             STRAPI_ADMIN_CLIENT_PREVIEW_SECRET=${{ secrets.PREVIEW_SECRET }}
