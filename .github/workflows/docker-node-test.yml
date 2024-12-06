@@ -6,6 +6,7 @@ on:
       - main 
       - develop
       - improvement-coding-and-documentation
+      - test-cd
     paths-ignore:
       - 'README.md'
       - 'docs/**'
@@ -80,11 +81,14 @@ jobs:
       env:
         JWT_SECRET: ${{ secrets.JWT_SECRET }}
         ADMIN_JWT_SECRET: ${{ secrets.ADMIN_JWT_SECRET }}
+        ADMIN_PREVIEW_SECRET: ${{ secrets.STRAPI_ADMIN_CLIENT_PREVIEW_SECRET }}
       run: |
         yarn install
         yarn seed
+        cat .env
         echo "JWT_SECRET=${JWT_SECRET}" >> .env
         echo "ADMIN_JWT_SECRET=${ADMIN_JWT_SECRET}" >> .env
+        echo "STRAPI_ADMIN_CLIENT_PREVIEW_SECRET=${ADMIN_PREVIEW_SECRET}" >> .env
 
     - name: Install client dependencies  
       working-directory: ./client

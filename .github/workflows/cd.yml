@@ -103,19 +103,19 @@ jobs:
             PREVIEW_SECRET=${{ secrets.PREVIEW_SECRET }}
           EOT
 
-            echo "Deploying API"
-            sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/foodadvisor-api:latest
-            sudo docker run -d --name foodadvisor-api \
-              -p 1337:1337 \
-              --env-file .env \
-              ${{ secrets.DOCKERHUB_USERNAME }}/foodadvisor-api:latest
-
             echo "Deploying Client"
             sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/foodadvisor-client:latest
             sudo docker run -d --name foodadvisor-client \
               -p 3000:3000 \
               --env-file .env \
               ${{ secrets.DOCKERHUB_USERNAME }}/foodadvisor-client:latest  
+
+            echo "Deploying API"
+            sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/foodadvisor-api:latest
+            sudo docker run -d --name foodadvisor-api \
+              -p 1337:1337 \
+              --env-file .env \
+              ${{ secrets.DOCKERHUB_USERNAME }}/foodadvisor-api:latest
 
             # Check API environment
             echo "Verifying API environment variables..."
