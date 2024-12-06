@@ -145,7 +145,7 @@ jobs:
               -v /app/client/.env:/app/client/.env \
               -v /app/client/.env.development:/app/client/.env.development \
               ${{ secrets.DOCKERHUB_USERNAME }}/foodadvisor-client:latest \
-              /bin/sh -c "yarn build"
+              /bin/sh -c "yarn build && yarn dev"
 
             # Verify container status
             echo "Checking container status..."
