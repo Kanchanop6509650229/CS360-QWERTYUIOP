@@ -12,10 +12,6 @@ RUN yarn install
 # Copy client source code
 COPY client/ .
 
-# Build the application
-RUN yarn build
-
 EXPOSE 3000
 
-# Use a CMD instead of direct command to allow override in docker run
 CMD ["yarn", "dev"]

@@ -90,7 +90,7 @@ jobs:
           echo "Waiting for instance setup to complete..."
           sleep 90
 
-          # Deploy using Docker Compose
+          # Deploy using Docker
           ssh -i private_key.pem -o StrictHostKeyChecking=no ec2-user@${INSTANCE_IP} << 'ENDSSH'
             # Install Docker
             sudo yum install -y docker
@@ -111,7 +111,6 @@ jobs:
             STRAPI_ADMIN_CLIENT_URL=http://${{ steps.create-ec2.outputs.public_ip }}:3000
             STRAPI_ADMIN_CLIENT_PREVIEW_SECRET=${{ secrets.PREVIEW_SECRET }}
             DATABASE_CLIENT=sqlite
-            DATABASE_FILENAME=.tmp/data.db
             NODE_ENV=production
           EOT
 
@@ -134,7 +133,6 @@ jobs:
               -p 1337:1337 \
               -v /app/api/.env:/app/api/.env \
               -v /app/api/public/uploads:/app/api/public/uploads \
-              -v /app/api/.tmp:/app/api/.tmp \
               ${{ secrets.DOCKERHUB_USERNAME }}/foodadvisor-api:latest
 
             # Pull and run Client container
@@ -144,8 +142,7 @@ jobs:
               -p 3000:3000 \
               -v /app/client/.env:/app/client/.env \
               -v /app/client/.env.development:/app/client/.env.development \
-              ${{ secrets.DOCKERHUB_USERNAME }}/foodadvisor-client:latest \
-              /bin/sh -c "yarn build && yarn dev"
+              ${{ secrets.DOCKERHUB_USERNAME }}/foodadvisor-client:latest
 
             # Verify container status
             echo "Checking container status..."

@@ -15,13 +15,12 @@ RUN yarn install
 # Copy API source code
 COPY api/ .
 
-# Create uploads directory and set permissions
-RUN mkdir -p public/uploads && chmod 777 public/uploads
+# Create uploads directory
+RUN mkdir -p public/uploads
 
-# Build the application
-RUN yarn build
+# Set environment for testing
+ENV NODE_ENV=test
 
 EXPOSE 1337
 
-# Start command that works with both development and production
-CMD ["sh", "-c", "yarn seed && yarn develop"]
+CMD ["yarn", "develop"]
