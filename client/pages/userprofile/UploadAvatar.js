@@ -8,6 +8,8 @@ const UploadAvatar = ({ userId, token, username, avatarUrl, setisUserUpdated }) 
     const [modal, setModal] = useState(false);
     const [file, setFile] = useState(null);
 
+    const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
     const toggle = () => {
         setModal(!modal);
     };
@@ -29,7 +31,7 @@ const UploadAvatar = ({ userId, token, username, avatarUrl, setisUserUpdated }) 
     const updateUserAvatarId = async (avatarId, avatarUrl) => {
         try {
             await axios.put(
-                `http://localhost:1337/api/users/${userId}`,
+                `${API_URL}/api/users/${userId}`,
                 { avatarId, avatarUrl },
                 {
                     headers: {
@@ -59,7 +61,7 @@ const UploadAvatar = ({ userId, token, username, avatarUrl, setisUserUpdated }) 
 
             const {
                 data: [{ id, url }],
-            } = await axios.post(`http://localhost:1337/api/upload`, files, {
+            } = await axios.post(`${API_URL}/api/upload`, files, {
                 headers: {
                     "Content-Type": "multipart/form-data",
                     Authorization: `bearer ${token}`,

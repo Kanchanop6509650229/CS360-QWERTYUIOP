@@ -15,11 +15,13 @@ const UserProfile = ({ token }) => {
    const [email, setEmail] = useState(user.setemail || "");
    const [job, setJob] = useState(user.setjob || "");
    const [gender, setGender] = useState(user.setgender || "");
+
+   const API_URL = process.env.NEXT_PUBLIC_API_URL;
    
    useEffect(() => {
     const getProfileData = async () => {
         try {                              //http:localhost:1337/api/users/me http://localhost:1337/api/users/1?populate=*
-            const {data} = await axios.get(`http://localhost:1337/api/users/me?populate=*`, {
+            const {data} = await axios.get(`${API_URL}/api/users/me?populate=*`, {
                 headers: {
                     Authorization: `bearer ${token}`,
                 },
@@ -38,7 +40,7 @@ const UserProfile = ({ token }) => {
        getProfileData()
    },[token, isUserUpdated])
 
-   const avatarUrl = user.picture?.url ? `http://localhost:1337${user.picture.url}` : null;
+   const avatarUrl = user.picture?.url ? `${API_URL}${user.picture.url}` : null;
 
    const handleUpdateInfo = async () => {
     try {
@@ -49,7 +51,7 @@ const UserProfile = ({ token }) => {
             job: job,
             gender: gender,
         };              //http:localhost:1337/api/users/me
-        await axios.put(`http://localhost:1337/api/users/me`, updateInfo, {
+        await axios.put(`${API_URL}/api/users/me`, updateInfo, {
             headers: {
                 Authorization: `Bearer ${token},`
             },
