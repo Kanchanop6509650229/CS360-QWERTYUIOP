@@ -94,19 +94,19 @@ jobs:
             sudo systemctl start docker
 
             echo "Debugging environment variables"
-            echo "JWT_SECRET=${JWT_SECRET}"
-            echo "ADMIN_JWT_SECRET=${ADMIN_JWT_SECRET}"
-            echo "STRAPI_ADMIN_CLIENT_PREVIEW_SECRET=${PREVIEW_SECRET}"
-            echo "NEXT_PUBLIC_API_URL=http://${INSTANCE_IP}:1337"
+            echo "JWT_SECRET=${{ secrets.JWT_SECRET }}"
+            echo "ADMIN_JWT_SECRET=${{ secrets.ADMIN_JWT_SECRET }}"
+            echo "STRAPI_ADMIN_CLIENT_PREVIEW_SECRET=${{ secrets.PREVIEW_SECRET }}"
+            echo "NEXT_PUBLIC_API_URL=http://${{ steps.create-ec2.outputs.public_ip }}:1337"
 
             echo "Creating .env file"
             cat <<EOT > .env
-            JWT_SECRET=${JWT_SECRET}
-            ADMIN_JWT_SECRET=${ADMIN_JWT_SECRET}
-            STRAPI_ADMIN_CLIENT_URL=http://${INSTANCE_IP}:3000
-            STRAPI_ADMIN_CLIENT_PREVIEW_SECRET=${PREVIEW_SECRET}
-            NEXT_PUBLIC_API_URL=http://${INSTANCE_IP}:1337
-            PREVIEW_SECRET=${PREVIEW_SECRET}
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            ADMIN_JWT_SECRET=${{ secrets.ADMIN_JWT_SECRET }}
+            STRAPI_ADMIN_CLIENT_URL=http://${{ steps.create-ec2.outputs.public_ip }}:3000
+            STRAPI_ADMIN_CLIENT_PREVIEW_SECRET=${{ secrets.PREVIEW_SECRET }}
+            NEXT_PUBLIC_API_URL=http://${{ steps.create-ec2.outputs.public_ip }}:1337
+            PREVIEW_SECRET=${{ secrets.PREVIEW_SECRET }}
           EOT
 
             echo "Deploying API"
