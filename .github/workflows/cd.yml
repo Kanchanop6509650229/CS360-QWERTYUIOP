@@ -1,6 +1,7 @@
 name: CD - Deploy to AWS
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
@@ -75,40 +76,41 @@ jobs:
       - name: Deploy using Docker Compose
         env:
           INSTANCE_IP: ${{ steps.create-ec2.outputs.public_ip }}
-          PRIVATE_KEY: ${{ secrets.AWS_SSH_KEY }}
+          PRIVATE_KEY: ${{ secrets.AWS_PRIVATE_KEY }}
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           ADMIN_JWT_SECRET: ${{ secrets.ADMIN_JWT_SECRET }}
           PREVIEW_SECRET: ${{ secrets.PREVIEW_SECRET }}
         run: |
           # Save private key
-          echo "$PRIVATE_KEY" > private_key.pem
-          chmod 600 private_key.pem
+          echo "$PRIVATE_KEY" > ${{ secrets.AWS_KP_NAME }}.pem
+          chmod 600 ${{ secrets.AWS_KP_NAME }}.pem
           # Wait for user-data script to complete
           echo "Waiting for instance setup to complete..."
           sleep 90
 
           # Deploy using Docker Compose
-          ssh -i private_key.pem -o StrictHostKeyChecking=no ec2-user@${INSTANCE_IP} << 'EOF'
+          ssh -i ${{ secrets.AWS_KP_NAME }}.pem -o StrictHostKeyChecking=no ec2-user@${INSTANCE_IP} << 'EOF'
             sudo yum install -y docker
             sudo systemctl start docker
 
             echo "Creating .env file"
             cat <<EOT > .env
-            JWT_SECRET=${{ secrets.JWT_SECRET }}
-            ADMIN_JWT_SECRET=${{ secrets.ADMIN_JWT_SECRET }}
-            STRAPI_ADMIN_CLIENT_URL=http://${{ steps.create-ec2.outputs.public_ip }}:3000
-            STRAPI_ADMIN_CLIENT_PREVIEW_SECRET=${{ secrets.PREVIEW_SECRET }}
-            NEXT_PUBLIC_API_URL=http://${{ steps.create-ec2.outputs.public_ip }}:1337
-            PREVIEW_SECRET=${{ secrets.PREVIEW_SECRET }}
+          JWT_SECRET=${{ secrets.JWT_SECRET }}
+          ADMIN_JWT_SECRET=${{ secrets.ADMIN_JWT_SECRET }}
+          STRAPI_ADMIN_CLIENT_URL=http://${{ steps.create-ec2.outputs.public_ip }}:3000
+          STRAPI_ADMIN_CLIENT_PREVIEW_SECRET=${{ secrets.PREVIEW_SECRET }}
+          NEXT_PUBLIC_API_URL=http://${{ steps.create-ec2.outputs.public_ip }}:1337
+          PREVIEW_SECRET=${{ secrets.PREVIEW_SECRET }}
           EOT
 
             echo "Deploying Client"
             sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/foodadvisor-client:latest
-            sudo docker run -d --name foodadvisor-client \
+            sudo docker run -itd --name foodadvisor-client \
               -p 3000:3000 \
-              --env-file .env \
               ${{ secrets.DOCKERHUB_USERNAME }}/foodadvisor-client:latest  
+            sudo docker cp .env $(docker ps -q):/app/client/.env
+            sudo docker exec -itd $(docker ps -q) yarn dev
 
             echo "Deploying API"
             sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/foodadvisor-api:latest
@@ -116,14 +118,6 @@ jobs:
               -p 1337:1337 \
               --env-file .env \
               ${{ secrets.DOCKERHUB_USERNAME }}/foodadvisor-api:latest
-
-            # Check API environment
-            echo "Verifying API environment variables..."
-            sudo docker exec foodadvisor-api printenv | grep -E "JWT_SECRET|ADMIN_JWT_SECRET|PREVIEW_SECRET"
-
-            # Check Client environment
-            echo "Verifying Client environment variables..."
-            sudo docker exec foodadvisor-client printenv | grep -E "PREVIEW_SECRET|NEXT_PUBLIC_API_URL"
           EOF
 
       - name: Verify deployment with enhanced checks
