@@ -953,3 +953,120 @@ To modify pipeline configuration:
 2. Update test scripts in respective package.json files
 3. Modify environment variables in GitHub Secrets
 4. Update cache configuration as dependencies change
+
+### Continuous Deployment (CD)
+
+#### Deployment Triggers
+- Successful CI pipeline completion
+- Push events to:
+  - `main`
+  - `develop`
+  - `improvement-coding-and-documentation`
+  - `test-cd`
+  - `time_test`
+
+#### Infrastructure Specifications
+- **Instance Type:** AWS EC2 t2.medium
+- **Storage:** 30GB gp3 volume
+- **Base Image:** Amazon Linux 2023
+- **Network:** Ports 3000 and 1337 exposed
+
+#### Deployment Components
+
+##### 1. Environment Setup
+```bash
+# Core environment variables
+JWT_SECRET=<secure-token>
+ADMIN_JWT_SECRET=<secure-token>
+STRAPI_ADMIN_CLIENT_URL=http://<instance-ip>:3000
+NEXT_PUBLIC_API_URL=http://<instance-ip>:1337
+```
+
+##### 2. Container Configuration
+- **API Container:**
+  ```yaml
+  name: foodadvisor-api
+  port: 1337
+  environment:
+    - NODE_ENV=production
+    - JWT_SECRET=${JWT_SECRET}
+  ```
+
+- **Client Container:**
+  ```yaml
+  name: foodadvisor-client
+  port: 3000
+  environment:
+    - NODE_ENV=production
+    - NEXT_PUBLIC_API_URL=${API_URL}
+  ```
+
+#### Automated Verification
+
+##### Endpoint Validation
+```bash
+check_endpoint() {
+  local url=$1
+  local max_attempts=10
+  
+  while [ $attempt -le $max_attempts ]; do
+    if curl --silent --fail "$url"; then
+      return 0
+    fi
+    sleep 15
+  done
+  return 1
+}
+```
+
+##### Health Checks
+- API endpoint verification
+- Client application accessibility
+- Database connection validation
+- Container health status
+
+#### Production Maintenance
+
+##### Resource Monitoring
+```bash
+# Disk usage monitoring
+THRESHOLD=90
+USAGE=$(df -h / | awk 'NR==2 {print $5}' | cut -d'%' -f1)
+
+if [ $USAGE -gt $THRESHOLD ]; then
+    docker system prune -af
+fi
+```
+
+##### Security Measures
+- AWS security group configuration
+- Environment variable encryption
+- JWT token management
+- Container network isolation
+
+#### Rollback Procedures
+
+##### Automatic Rollback Triggers
+- Failed health checks
+- Invalid API responses
+- Container startup failures
+
+##### Recovery Steps
+1. Previous image restoration
+2. Environment reconfiguration
+3. Health check verification
+4. System state validation
+
+### Monitoring Tools
+
+#### Available Metrics
+- Container resource usage
+- API response times
+- Database performance
+- Disk space utilization
+
+#### Alert Configuration
+- Resource threshold notifications
+- Deployment status updates
+- Error rate monitoring
+- Security incident alerts
