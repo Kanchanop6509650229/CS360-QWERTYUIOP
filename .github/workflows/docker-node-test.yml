@@ -8,6 +8,7 @@ on:
       - develop
       - improvement-coding-and-documentation
       - test-cd
+      - time_test
     paths-ignore:
       - 'README.md'
       - 'docs/**'
