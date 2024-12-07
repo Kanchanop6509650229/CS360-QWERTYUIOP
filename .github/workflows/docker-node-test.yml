@@ -1,12 +1,14 @@
 name: CI - Test and Deploy Docker Images
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main 
       - develop
       - improvement-coding-and-documentation
       - test-cd
+      - time_test
     paths-ignore:
       - 'README.md'
       - 'docs/**'
