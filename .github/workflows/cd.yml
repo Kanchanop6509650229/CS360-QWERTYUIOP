@@ -1,6 +1,7 @@
 name: CD - Deploy to AWS
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
@@ -33,7 +34,7 @@ jobs:
           if [ "$RESPONSE" -ne 200 ]; then
               echo "Docker image not found. Exiting workflow."
               exit 1
-          fi
+            fi
           echo "Docker image exists. Proceeding to deployment."
 
       - name: Check if Docker Image Exists Client
@@ -47,7 +48,6 @@ jobs:
               exit 1
           fi
           echo "Docker image exists. Proceeding to deployment."
-
       - name: Create EC2 instance
         id: create-ec2
         run: |
@@ -73,91 +73,54 @@ jobs:
             --output text)
             
           echo "public_ip=$PUBLIC_IP" >> $GITHUB_OUTPUT
-
       - name: Deploy using Docker Compose
         env:
           INSTANCE_IP: ${{ steps.create-ec2.outputs.public_ip }}
-          PRIVATE_KEY: ${{ secrets.AWS_SSH_KEY }}
+          PRIVATE_KEY: ${{ secrets.AWS_PRIVATE_KEY }}
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           ADMIN_JWT_SECRET: ${{ secrets.ADMIN_JWT_SECRET }}
           PREVIEW_SECRET: ${{ secrets.PREVIEW_SECRET }}
         run: |
           # Save private key
-          echo "$PRIVATE_KEY" > private_key.pem
-          chmod 600 private_key.pem
+          echo "$PRIVATE_KEY" > ${{ secrets.AWS_KP_NAME }}.pem
+          chmod 600 ${{ secrets.AWS_KP_NAME }}.pem
           # Wait for user-data script to complete
           echo "Waiting for instance setup to complete..."
           sleep 90
 
-          # Deploy using Docker
-          ssh -i private_key.pem -o StrictHostKeyChecking=no ec2-user@${INSTANCE_IP} << 'ENDSSH'
-            # Install Docker
+          # Deploy using Docker Compose
+          ssh -i ${{ secrets.AWS_KP_NAME }}.pem -o StrictHostKeyChecking=no ec2-user@${INSTANCE_IP} << 'EOF'
             sudo yum install -y docker
             sudo systemctl start docker
-            sudo systemctl enable docker
-            sudo usermod -aG docker ec2-user
-            
-            # Create application directories
-            sudo mkdir -p /app/api /app/client
-            sudo chown -R ec2-user:docker /app
-            
-            # Create API .env file
-            cat > /app/api/.env << EOT
-            HOST=0.0.0.0
-            PORT=1337
-            ADMIN_JWT_SECRET=${{ secrets.ADMIN_JWT_SECRET }}
-            JWT_SECRET=${{ secrets.JWT_SECRET }}
-            STRAPI_ADMIN_CLIENT_URL=http://${{ steps.create-ec2.outputs.public_ip }}:3000
-            STRAPI_ADMIN_CLIENT_PREVIEW_SECRET=${{ secrets.PREVIEW_SECRET }}
-            DATABASE_CLIENT=sqlite
-            NODE_ENV=production
+
+            echo "Creating .env file"
+            cat <<EOT > .env
+          JWT_SECRET=${{ secrets.JWT_SECRET }}
+          ADMIN_JWT_SECRET=${{ secrets.ADMIN_JWT_SECRET }}
+          STRAPI_ADMIN_CLIENT_URL=http://${{ steps.create-ec2.outputs.public_ip }}:3000
+          STRAPI_ADMIN_CLIENT_PREVIEW_SECRET=${{ secrets.PREVIEW_SECRET }}
+          NEXT_PUBLIC_API_URL=http://${{ steps.create-ec2.outputs.public_ip }}:1337
+          PREVIEW_SECRET=${{ secrets.PREVIEW_SECRET }}
           EOT
 
-            # Create Client .env files
-            cat > /app/client/.env << EOT
-            NEXT_PUBLIC_API_URL=http://${{ steps.create-ec2.outputs.public_ip }}:1337
-            PREVIEW_SECRET=${{ secrets.PREVIEW_SECRET }}
-            NODE_ENV=production
-          EOT
-
-            cat > /app/client/.env.development << EOT
-            NEXT_PUBLIC_API_URL=http://${{ steps.create-ec2.outputs.public_ip }}:1337
-            PREVIEW_SECRET=${{ secrets.PREVIEW_SECRET }}
-          EOT
-
-            # Pull and run API container
-            sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/foodadvisor-api:latest
-            sudo docker run -d \
-              --name foodadvisor-api \
-              -p 1337:1337 \
-              -v /app/api/.env:/app/api/.env \
-              -v /app/api/public/uploads:/app/api/public/uploads \
-              ${{ secrets.DOCKERHUB_USERNAME }}/foodadvisor-api:latest
-
-            # Pull and run Client container
+            echo "Deploying Client"
             sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/foodadvisor-client:latest
-            sudo docker run -d \
-              --name foodadvisor-client \
+            sudo docker run -itd --name foodadvisor-client \
               -p 3000:3000 \
-              -v /app/client/.env:/app/client/.env \
-              -v /app/client/.env.development:/app/client/.env.development \
-              ${{ secrets.DOCKERHUB_USERNAME }}/foodadvisor-client:latest
+              ${{ secrets.DOCKERHUB_USERNAME }}/foodadvisor-client:latest  
+            sudo docker cp .env $(docker ps -q):/app/client/.env
+            sudo docker exec -itd $(docker ps -q) yarn dev
 
-            # Verify container status
-            echo "Checking container status..."
-            sudo docker ps
-            
-            # Print environment files for verification
-            echo "API Environment:"
-            cat /app/api/.env
-            echo "Client Environment:"
-            cat /app/client/.env
-            echo "Client Development Environment:"
-            cat /app/client/.env.development
-          ENDSSH
+            echo "Deploying API"
+            sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/foodadvisor-api:latest
+            sudo docker run -d --name foodadvisor-api \
+              -p 1337:1337 \
+              --env-file .env \
+              ${{ secrets.DOCKERHUB_USERNAME }}/foodadvisor-api:latest
+          EOF
 
-      - name: Verify deployment
+      - name: Verify deployment with enhanced checks
         env:
           INSTANCE_IP: ${{ steps.create-ec2.outputs.public_ip }}
         run: |
@@ -193,11 +156,3 @@ jobs:
           fi
 
           echo "Deployment verified successfully!"
-          echo "API URL: http://${INSTANCE_IP}:1337"
-          echo "Client URL: http://${INSTANCE_IP}:3000"
-
-      - name: Cleanup on failure
-        if: failure()
-        env:
-          INSTANCE_ID: ${{ steps.create-ec2.outputs.instance_id }}
-        run: aws ec2 terminate-instances --instance-ids $INSTANCE_ID
